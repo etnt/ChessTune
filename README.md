@@ -55,66 +55,68 @@ using transformer-based models. Let's break this down:
     
 Pre-trained model:
     
-     * This is a neural network that has already been trained on a large corpus of text data.
+* This is a neural network that has already been trained on a large corpus of text data.
     
-     * In this case, we're using GPT-2 (specifically, the "medium" size version), which was
-      trained by OpenAI on a diverse range of internet text.
+* In this case, we're using GPT-2 (specifically, the "medium" size version), which was
+trained by OpenAI on a diverse range of internet text.
     
-     * The model has learned to predict the next word in a sequence, capturing complex patterns
-      and relationships in language.
+* The model has learned to predict the next word in a sequence, capturing complex patterns
+and relationships in language.
     
-     * By loading a pre-trained model, we're leveraging this existing knowledge as a starting point,
-      rather than training a model from scratch.
+* By loading a pre-trained model, we're leveraging this existing knowledge as a starting point,
+rather than training a model from scratch.
     
 Associated tokenizer:
     
-     * A tokenizer is a tool that breaks down text into smaller units called tokens.
+* A tokenizer is a tool that breaks down text into smaller units called tokens.
     
-     * These tokens could be words, parts of words, or even individual characters,
-      depending on the tokenization strategy.
+* These tokens could be words, parts of words, or even individual characters,
+depending on the tokenization strategy.
     
-     * The tokenizer associated with a pre-trained model knows exactly how the text
-      was split during the original training process.
+* The tokenizer associated with a pre-trained model knows exactly how the text
+was split during the original training process.
     
-     * It's crucial to use the same tokenizer as the pre-trained model to ensure
-      consistency in how text is processed.
+* It's crucial to use the same tokenizer as the pre-trained model to ensure
+consistency in how text is processed.
 
 ### Ensure the tokenizer has a padding token
  
 1. Padding tokens:
     
-     * In NLP, we often need to process sequences of different lengths in batches.
+    * In NLP, we often need to process sequences of different lengths in batches.
     
-     * To do this efficiently, we typically pad shorter sequences to match the length
-      of the longest sequence in the batch.
+    * To do this efficiently, we typically pad shorter sequences to match the length
+    of the longest sequence in the batch.
     
-     * A padding token is a special token used for this purpose. It doesn't carry
-      any meaning and is ignored during processing.
+    * A padding token is a special token used for this purpose. It doesn't carry
+    any meaning and is ignored during processing.
     
 2. GPT-2's lack of a padding token:
     
-     * Unlike some other models, GPT-2 doesn't have a dedicated padding token by default.
+    * Unlike some other models, GPT-2 doesn't have a dedicated padding token by default.
     
-     * This can cause issues when trying to process batches of sequences with varying lengths.
+    * This can cause issues when trying to process batches of sequences with varying lengths.
     
 3. Using the EOS token as a padding token:
     
-     * EOS stands for "End of Sequence".
+    * EOS stands for "End of Sequence".
     
-     * By setting tokenizer.pad_token = tokenizer.eos_token, we're telling the tokenizer
-      to use the End of Sequence token as a padding token.
+    * By setting tokenizer.pad_token = tokenizer.eos_token, we're telling the tokenizer
+    to use the End of Sequence token as a padding token.
     
-     * This is a common workaround for GPT-2 models.
+    * This is a common workaround for GPT-2 models.
     
 4. Why this works:
     
-     * The EOS token is already treated specially by the model (it signifies the end of input).
-     * Using it as a padding token ensures that the model will effectively ignore the padding,
-      as it would stop processing at the first EOS token it encounters.
+    * The EOS token is already treated specially by the model (it signifies the end of input).
+
+    * Using it as a padding token ensures that the model will effectively ignore the padding,
+    as it would stop processing at the first EOS token it encounters.
     
 5. Implications:
     
-     * This allows us to process batches of sequences with different lengths efficiently.
-     * It ensures that the padding doesn't interfere with the model's understanding of the actual content.
+    * This allows us to process batches of sequences with different lengths efficiently.
+    
+    * It ensures that the padding doesn't interfere with the model's understanding of the actual content.
     
 GPT-2 doesn't have a padding token by default, so we use the EOS token instead
