@@ -50,12 +50,14 @@ def main(pgn_file_path):
     # Set up training arguments
     training_args = TrainingArguments(
         output_dir="./results",
-        num_train_epochs=1,
+        num_train_epochs=3,  # Adjust this as needed
         per_device_train_batch_size=4,
-        save_steps=10_000,
+        save_steps=1000,
         save_total_limit=2,
-        max_steps=1,  # Only run for one step
-        prediction_loss_only=True,
+        logging_steps=100,
+        evaluation_strategy="steps",
+        eval_steps=500,
+        load_best_model_at_end=True,
     )
 
     # Initialize Trainer
@@ -63,17 +65,17 @@ def main(pgn_file_path):
         model=model,
         args=training_args,
         train_dataset=tokenized_dataset,
+        eval_dataset=tokenized_dataset,  # Using the same dataset for evaluation (you might want to create a separate validation set)
         data_collator=data_collator,
     )
 
-    print("Trainer initialized successfully")
+    print("Starting training...")
+    trainer.train()
+    print("Training completed")
 
-    # Run a single training step
-    try:
-        trainer.train()
-        print("Single training step completed successfully")
-    except Exception as e:
-        print(f"Error during training: {str(e)}")
+    # Save the model
+    trainer.save_model("./chess_model")
+    print("Model saved")
 
 if __name__ == "__main__":
     pgn_file_path = "Mikhail-Tal-Best-Games.pgn"  # Replace with your actual file path
