@@ -1,9 +1,10 @@
 import chess
 import chess.pgn
+import argparse
 from datasets import Dataset
 from transformers import AutoTokenizer, GPT2LMHeadModel, Trainer, TrainingArguments, DataCollatorForLanguageModeling
 
-def preprocess_pgn(pgn_file_path, max_games=10):
+def preprocess_pgn(pgn_file_path, max_games=100):
     games = []
     with open(pgn_file_path) as pgn:
         for _ in range(max_games):
@@ -55,7 +56,7 @@ def main(pgn_file_path):
         save_steps=1000,
         save_total_limit=2,
         logging_steps=100,
-        evaluation_strategy="steps",
+        eval_strategy="steps",  # Instead of evaluation_strategy
         eval_steps=500,
         load_best_model_at_end=True,
     )
@@ -78,5 +79,13 @@ def main(pgn_file_path):
     print("Model saved")
 
 if __name__ == "__main__":
-    pgn_file_path = "Mikhail-Tal-Best-Games.pgn"  # Replace with your actual file path
-    main(pgn_file_path)
+    # Set up argument parser
+    parser = argparse.ArgumentParser(description="Fine-tune a language model on chess games.")
+    parser.add_argument("pgn_file_path", help="Path to the PGN file containing chess games")
+    
+    # Parse arguments
+    args = parser.parse_args()
+
+    # pgn_file_path = "Mikhail-Tal-Best-Games.pgn"  # Replace with your actual file path
+
+    main(args.pgn_file_path)
