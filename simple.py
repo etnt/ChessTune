@@ -4,7 +4,7 @@ import argparse
 from datasets import Dataset
 from transformers import AutoTokenizer, GPT2LMHeadModel, Trainer, TrainingArguments, DataCollatorForLanguageModeling
 
-def preprocess_pgn(pgn_file_path, max_games=100):
+def preprocess_pgn(pgn_file_path, max_games=10):
     games = []
     with open(pgn_file_path) as pgn:
         for _ in range(max_games):
@@ -34,7 +34,11 @@ def main(pgn_file_path):
 
     # Initialize tokenizer
     global tokenizer
-    tokenizer = AutoTokenizer.from_pretrained("gpt2-medium")
+    # GPT2-medium is chosen here, but you might want to experiment with other models
+    model_name = "gpt2-medium"
+
+    # Download and initialize the tokenizer that was used with our choosen model.
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
     tokenizer.pad_token = tokenizer.eos_token
 
     # Tokenize the dataset
@@ -42,7 +46,7 @@ def main(pgn_file_path):
     print("Dataset tokenized")
 
     # Initialize model
-    model = GPT2LMHeadModel.from_pretrained("gpt2-medium")
+    model = GPT2LMHeadModel.from_pretrained(model_name)
     model.resize_token_embeddings(len(tokenizer))
 
     # Set up data collator
@@ -51,10 +55,26 @@ def main(pgn_file_path):
     # Set up training arguments
     training_args = TrainingArguments(
         output_dir="./results",
+
+        # An epoch is one complete pass through the entire training dataset.
+        # More epochs can lead to better learning, but too many can cause overfitting.
         num_train_epochs=3,  # Adjust this as needed
+
+        # This sets the batch size for training on each device (e.g., GPU or CPU).
+        # Larger batch sizes can lead to faster training but require more memory.
         per_device_train_batch_size=4,
+
+        # This parameter determines how often the model is saved during training.
+        # A "step" typically refers to processing one batch of data.
+        # In this case, the model will be saved every 1000 steps.
         save_steps=1000,
+
+        # This parameter limits the total number of checkpoint files saved.
+        # When this limit is reached, older checkpoints are deleted.
+        # This is useful for saving disk space, as model checkpoints can be large
         save_total_limit=2,
+
+        
         logging_steps=100,
         eval_strategy="steps",  # Instead of evaluation_strategy
         eval_steps=500,
