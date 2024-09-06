@@ -4,10 +4,11 @@ import argparse
 from datasets import Dataset
 from transformers import AutoTokenizer, GPT2LMHeadModel, Trainer, TrainingArguments, DataCollatorForLanguageModeling
 
-def preprocess_pgn(pgn_file_path, max_games=100):
+def preprocess_pgn(pgn_file_path, max_games=None):
     games = []
     with open(pgn_file_path) as pgn:
-        for _ in range(max_games):
+        game_count = 0
+        while True:
             game = chess.pgn.read_game(pgn)
             if game is None:
                 break
@@ -18,14 +19,17 @@ def preprocess_pgn(pgn_file_path, max_games=100):
                 board.push(move)
             moves_str = " ".join(moves)
             games.append({"text": moves_str})
+            game_count += 1
+            if max_games is not None and game_count >= max_games:
+                break
     return games
 
 def tokenize_function(examples):
     return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=512)
 
-def main(pgn_file_path):
+def main(pgn_file_path, max_games=None):
     # Load and preprocess data
-    chess_data = preprocess_pgn(pgn_file_path)
+    chess_data = preprocess_pgn(pgn_file_path, max_games)
     print(f"Processed {len(chess_data)} games")
 
     # Create a Dataset object
@@ -102,10 +106,11 @@ if __name__ == "__main__":
     # Set up argument parser
     parser = argparse.ArgumentParser(description="Fine-tune a language model on chess games.")
     parser.add_argument("pgn_file_path", help="Path to the PGN file containing chess games")
+    parser.add_argument("--max-games", type=int, help="Maximum number of games to process (default: all games)")
     
     # Parse arguments
     args = parser.parse_args()
 
     # pgn_file_path = "Mikhail-Tal-Best-Games.pgn"  # Replace with your actual file path
 
-    main(args.pgn_file_path)
+    main(args.pgn_file_path, args.max_games)

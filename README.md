@@ -22,8 +22,8 @@ ChessTune is a project that uses machine learning to train a model on chess game
 1. Ensure you have Python 3.x installed.
 2. Clone this repository.
 3. Run `make all` to set up the virtual environment and prepare the data.
-4. Use `make run` to start the training process.
-5. After training, run `python play-chess.py` to play against the AI.
+4. Run: `./venv/bin/python chess-tune.py <pgn-file> [--max-games <max-games>]` to start the training process.
+5. After training, run: `./venv/bin/python play-chess.py` to play against the AI.
 
 ## Requirements
 

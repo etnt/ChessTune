@@ -37,7 +37,11 @@ clean:
 # Run the Client
 .PHONY: run
 run: venv $(PGN_FILE)
-	$(VENV_NAME)/bin/python chess-tune.py
+	@if [ -z "$(MAX_GAMES)" ]; then \
+		$(VENV_NAME)/bin/python chess-tune.py $(PGN_FILE); \
+	else \
+		$(VENV_NAME)/bin/python chess-tune.py $(PGN_FILE) --max-games $(MAX_GAMES); \
+	fi
 
 # Run tests
 .PHONY: test
