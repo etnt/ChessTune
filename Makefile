@@ -23,13 +23,9 @@ clean:
 	rm -rf $(VENV_NAME)
 
 # Run the Client
-.PHONY: categorize
-categorize: venv
-	$(VENV_NAME)/bin/python categorize-lux-tests.py
-
-.PHONY: group
-group: venv
-	$(VENV_NAME)/bin/python group-tests.py
+.PHONY: run
+run: venv
+	$(VENV_NAME)/bin/python chess-tune.py
 
 # Run tests
 .PHONY: test
@@ -41,9 +37,3 @@ test: venv
 add:
 	@read -p "Enter package name: " package; \
 	$(PIP) install $$package && $(PIP) freeze | grep -i $$package >> $(REQUIREMENTS)
-
-# Summarize tests
-.PHONY: summarize-tests
-summarize-tests: venv
-	$(eval EXTRA_ARGS ?=)
-	$(VENV_NAME)/bin/python summarize_lux_tests.py $(LUX_TESTS_DIR) $(EXTRA_ARGS)
