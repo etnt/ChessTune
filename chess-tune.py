@@ -3,6 +3,7 @@ import chess.pgn
 import argparse
 from datasets import Dataset
 from transformers import AutoTokenizer, GPT2LMHeadModel, Trainer, TrainingArguments, DataCollatorForLanguageModeling
+import os
 
 def preprocess_pgn(pgn_file_path, max_games=None):
     games = []
@@ -27,13 +28,21 @@ def preprocess_pgn(pgn_file_path, max_games=None):
 def tokenize_function(examples):
     return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=512)
 
-def main(pgn_file_path, max_games=None, resume_from=None):
-    # Load and preprocess data
-    chess_data = preprocess_pgn(pgn_file_path, max_games)
-    print(f"Processed {len(chess_data)} games")
+def main(pgn_dir, max_games=None, resume_from=None):
+    all_chess_data = []
+    for filename in os.listdir(pgn_dir):
+        if filename.endswith('.pgn'):
+            pgn_file_path = os.path.join(pgn_dir, filename)
+            chess_data = preprocess_pgn(pgn_file_path, max_games)
+            all_chess_data.extend(chess_data)
+            if max_games and len(all_chess_data) >= max_games:
+                all_chess_data = all_chess_data[:max_games]
+                break
+    
+    print(f"Processed {len(all_chess_data)} games in total")
 
     # Create a Dataset object
-    dataset = Dataset.from_list(chess_data)
+    dataset = Dataset.from_list(all_chess_data)
     print(f"Dataset size: {len(dataset)}")
 
     # Initialize tokenizer
@@ -55,7 +64,7 @@ def main(pgn_file_path, max_games=None, resume_from=None):
         model = GPT2LMHeadModel.from_pretrained(resume_from)
     else:
         print("Starting training from scratch")
-        model = GPT2LMHeadModel.from_pretrained("gpt2-medium")
+        model = GPT2LMHeadModel.from_pretrained(model_name)
     
     model.resize_token_embeddings(len(tokenizer))
 
@@ -111,7 +120,7 @@ def main(pgn_file_path, max_games=None, resume_from=None):
 if __name__ == "__main__":
     # Set up argument parser
     parser = argparse.ArgumentParser(description="Fine-tune a language model on chess games.")
-    parser.add_argument("pgn_file_path", help="Path to the PGN file containing chess games")
+    parser.add_argument("pgn_dir", help="Directory containing PGN files")
     parser.add_argument("--max-games", type=int, help="Maximum number of games to process (default: all games)")
     parser.add_argument("--resume-from", help="Path to the model to resume training from")
     
@@ -120,4 +129,4 @@ if __name__ == "__main__":
 
     # pgn_file_path = "Mikhail-Tal-Best-Games.pgn"  # Replace with your actual file path
 
-    main(args.pgn_file_path, args.max_games, args.resume_from)
+    main(args.pgn_dir, args.max_games, args.resume_from)

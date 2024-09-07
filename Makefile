@@ -34,6 +34,10 @@ $(PGN_DIR)/%.pgn: $(PGN_DIR)/%.pgn.gz
 clean:
 	rm -rf $(VENV_NAME)
 	rm -f $(UNZIPPED_PGNS)
+
+# Clean up the model
+.PHONY: clean_model
+clean_model:
 	rm -rf ./chess_model
 
 # Run the Client
