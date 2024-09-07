@@ -13,7 +13,7 @@ ChessTune is a project that uses machine learning to train a model on chess game
 
 1. **Data Preparation**: The script processes a large PGN file containing chess games, converting them into a format suitable for training a language model.
 
-2. **Model Training**: A GPT-2 model is fine-tuned on the processed chess data, learning to predict the next move given a sequence of previous moves.
+2. **Model Training**: A GPT-2 model is fine-tuned on the processed chess data, learning to predict the next move given a sequence of previous moves. When we fine-tune a model, we're adjusting the weights of the neural network to better perform on our specific task (chess moves, in this case). 
 
 3. **Gameplay**: The `play-chess.py` script sets up a chess board and alternates between human and AI moves. The AI generates move suggestions using the trained model and chooses a legal move from these suggestions.
 

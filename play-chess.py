@@ -17,7 +17,8 @@ def load_model(model_path):
     """
     # Load the pre-trained model from the specified path
     model = GPT2LMHeadModel.from_pretrained(model_path)
-    # Load the tokenizer associated with the GPT-2 medium model
+    # By using the original GPT-2 tokenizer, we're ensuring that our fine-tuned model
+    # receives input in the format it expects, based on its original architecture and training.
     tokenizer = AutoTokenizer.from_pretrained("gpt2-medium")
     # Set the pad token to be the same as the end-of-sequence token
     tokenizer.pad_token = tokenizer.eos_token

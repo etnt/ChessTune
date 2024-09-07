@@ -63,3 +63,21 @@ test: venv
 add:
 	@read -p "Enter package name: " package; \
 	$(PIP) install $$package && $(PIP) freeze | grep -i $$package >> $(REQUIREMENTS)
+
+# Start the chess server
+.PHONY: server
+server: venv
+	@if [ -z "$(MODEL)" ] && [ -z "$(PORT)" ]; then \
+		$(VENV_NAME)/bin/python chess_server.py; \
+	elif [ -z "$(PORT)" ]; then \
+		$(VENV_NAME)/bin/python chess_server.py --model $(MODEL); \
+	elif [ -z "$(MODEL)" ]; then \
+		$(VENV_NAME)/bin/python chess_server.py --port $(PORT); \
+	else \
+		$(VENV_NAME)/bin/python chess_server.py --model $(MODEL) --port $(PORT); \
+	fi
+
+# Run server tests
+.PHONY: test-server
+test-server: venv
+	$(VENV_NAME)/bin/python test_chess_server.py
