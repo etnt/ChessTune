@@ -3,6 +3,7 @@ import chess.pgn
 from transformers import GPT2LMHeadModel, AutoTokenizer
 import torch
 import random
+import argparse
 
 def load_model(model_path):
     """
@@ -83,12 +84,12 @@ def algebraic_to_uci(board, move_san):
     except ValueError:
         return None
 
-def play_game():
+def play_game(model_path):
     """
     Main function to play a game of chess against the AI.
     """
     # Load the trained model and tokenizer
-    model, tokenizer = load_model("./chess_model")
+    model, tokenizer = load_model(model_path)
     # Initialize a new chess board
     board = chess.Board()
 
@@ -152,4 +153,9 @@ def play_game():
     print("Result:", board.result())
 
 if __name__ == "__main__":
-    play_game()
+    parser = argparse.ArgumentParser(description="Play chess against an AI trained with GPT-2.")
+    parser.add_argument("--model", default="./chess_model", help="Path to the trained model (default: ./chess_model)")
+    
+    args = parser.parse_args()
+
+    play_game(args.model)
