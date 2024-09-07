@@ -8,6 +8,7 @@ ChessTune is a project that uses machine learning to train a model on chess game
 - **Model Training**: Uses a GPT-2 model to learn chess move patterns from processed game data.
 - **Interactive Gameplay**: Allows users to play chess against the trained AI model.
 - **Move Generation**: The AI generates multiple move suggestions and chooses the best legal move.
+- **HTTP API**: Provides a simple HTTP API to interact with the trained model.
 
 ## How It Works
 
@@ -22,15 +23,11 @@ ChessTune is a project that uses machine learning to train a model on chess game
 1. Ensure you have Python 3.x installed.
 2. Clone this repository.
 3. Run `make all` to set up the virtual environment and prepare the data.
-4. Run: `./venv/bin/python chess-tune.py <pgn-file> [--max-games <max-games>]` to start the training process.
+4. Run: `./venv/bin/python chess-tune.py <pgn-directory> [--max-games <max-games>]` to start the training process.
 5. After training, run: `./venv/bin/python play-chess.py` to play against the AI.
+or `./venv/bin/python chess-server.py` to run the chess server.
 
 ## Requirements
-
-- Python 3.x
-- PyTorch
-- Transformers library
-- Python-chess
 
 A complete list of requirements can be found in `requirements.txt`.
 
@@ -38,6 +35,9 @@ A complete list of requirements can be found in `requirements.txt`.
 
 - `chess-tune.py`: Main script for processing data and training the model.
 - `play-chess.py`: Script for playing chess against the trained AI.
+- `chess-server.py`: Script for running the chess server.
+- `test_chess_server.py`: Script for testing the chess server.
+- `PGN`: directory containing PGN files for training.
 
 ## Time to train
 
@@ -92,7 +92,7 @@ HTTP/1.1 200 OK
 ```
 
 
-## Notes
+## Some Notes
 
 ### Load a pre-trained model and its associated tokenizer
 
