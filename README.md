@@ -44,11 +44,53 @@ A complete list of requirements can be found in `requirements.txt`.
 On a Macbook Pro M1 Max with 64 GB of RAM, training capacity is roughly 11 games per minute.
 For example: 1067 games took 83 minutes to train, and 2924 games took 264 minutes to train.
 
-## Future Improvements
+## HTTP API
 
-- Implement a GUI for a more user-friendly chess playing experience.
-- Optimize the model for better move prediction and gameplay.
-- Add support for different chess variants.
+Initialize a game:
+
+```bash
+$ curl -is -X POST http://127.0.0.1:5000/init
+HTTP/1.1 200 OK
+                                      
+{               
+  "message": "New game initialized",
+  "status": "ok"                                                                                     
+}                                    
+```
+
+Make a move:
+
+```bash
+$ curl -is -X POST -H "Content-Type: application/json" -d '{"move": "e2e4"}' http://127.0.0.1:5000/move
+HTTP/1.1 200 OK
+{
+  "message": "Move e2e4 applied",
+  "status": "ok"
+}
+```
+
+Get the AI's move:
+
+```bash
+$ curl -is -X GET http://127.0.0.1:5000/get_move
+HTTP/1.1 200 OK
+{
+  "move": "Nf6",
+  "status": "ok"
+}
+```
+
+Get the board state:
+
+```bash
+$ curl -is -X GET http://127.0.0.1:5000/board
+HTTP/1.1 200 OK
+{                                                 
+  "fen": "rnbqkb1r/pppppppp/5n2/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 1 2",
+  "status": "ok"                                  
+}   
+```
+
 
 ## Notes
 
