@@ -3,12 +3,13 @@ VENV_NAME := venv
 PYTHON := python3
 PIP := $(VENV_NAME)/bin/pip
 REQUIREMENTS := requirements.txt
-PGN_FILE := ficsgamesdb_202401_standard2000_nomovetimes_397466.pgn
-ZIPPED_PGN := $(PGN_FILE).gz
+PGN_DIR := PGN
+ZIPPED_PGNS := $(wildcard $(PGN_DIR)/*.pgn.gz)
+UNZIPPED_PGNS := $(patsubst %.gz,%,$(ZIPPED_PGNS))
 
 # Default target
 .PHONY: all
-all: venv $(PGN_FILE)
+all: venv unzip_pgns
 
 # Create virtual environment and install requirements
 .PHONY: venv
@@ -19,28 +20,33 @@ $(VENV_NAME)/bin/activate: $(REQUIREMENTS)
 	$(PIP) install -r $(REQUIREMENTS)
 	touch $(VENV_NAME)/bin/activate
 
-# Unzip PGN file if it doesn't exist
-$(PGN_FILE): $(ZIPPED_PGN)
-	@if [ ! -f $(PGN_FILE) ]; then \
-		echo "Unzipping $(ZIPPED_PGN)..."; \
-		gunzip -k $(ZIPPED_PGN); \
-	else \
-		echo "$(PGN_FILE) already exists."; \
-	fi
+# Unzip all PGN files
+.PHONY: unzip_pgns
+unzip_pgns: $(UNZIPPED_PGNS)
+
+# Rule to unzip individual PGN files
+$(PGN_DIR)/%.pgn: $(PGN_DIR)/%.pgn.gz
+	@echo "Unzipping $<..."
+	@gunzip -k $<
 
 # Clean up
 .PHONY: clean
 clean:
 	rm -rf $(VENV_NAME)
-	rm -f $(PGN_FILE)
+	rm -f $(UNZIPPED_PGNS)
+	rm -rf ./chess_model
 
 # Run the Client
 .PHONY: run
-run: venv $(PGN_FILE)
-	@if [ -z "$(MAX_GAMES)" ]; then \
+run: venv unzip_pgns
+	@if [ -z "$(MAX_GAMES)" ] && [ -z "$(RESUME_FROM)" ]; then \
 		$(VENV_NAME)/bin/python chess-tune.py $(PGN_FILE); \
-	else \
+	elif [ -z "$(RESUME_FROM)" ]; then \
 		$(VENV_NAME)/bin/python chess-tune.py $(PGN_FILE) --max-games $(MAX_GAMES); \
+	elif [ -z "$(MAX_GAMES)" ]; then \
+		$(VENV_NAME)/bin/python chess-tune.py $(PGN_FILE) --resume-from $(RESUME_FROM); \
+	else \
+		$(VENV_NAME)/bin/python chess-tune.py $(PGN_FILE) --max-games $(MAX_GAMES) --resume-from $(RESUME_FROM); \
 	fi
 
 # Run tests

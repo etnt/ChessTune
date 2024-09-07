@@ -27,7 +27,7 @@ def preprocess_pgn(pgn_file_path, max_games=None):
 def tokenize_function(examples):
     return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=512)
 
-def main(pgn_file_path, max_games=None):
+def main(pgn_file_path, max_games=None, resume_from=None):
     # Load and preprocess data
     chess_data = preprocess_pgn(pgn_file_path, max_games)
     print(f"Processed {len(chess_data)} games")
@@ -50,7 +50,13 @@ def main(pgn_file_path, max_games=None):
     print("Dataset tokenized")
 
     # Initialize model
-    model = GPT2LMHeadModel.from_pretrained(model_name)
+    if resume_from and os.path.exists(resume_from):
+        print(f"Resuming training from {resume_from}")
+        model = GPT2LMHeadModel.from_pretrained(resume_from)
+    else:
+        print("Starting training from scratch")
+        model = GPT2LMHeadModel.from_pretrained("gpt2-medium")
+    
     model.resize_token_embeddings(len(tokenizer))
 
     # Set up data collator
@@ -107,10 +113,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fine-tune a language model on chess games.")
     parser.add_argument("pgn_file_path", help="Path to the PGN file containing chess games")
     parser.add_argument("--max-games", type=int, help="Maximum number of games to process (default: all games)")
+    parser.add_argument("--resume-from", help="Path to the model to resume training from")
     
     # Parse arguments
     args = parser.parse_args()
 
     # pgn_file_path = "Mikhail-Tal-Best-Games.pgn"  # Replace with your actual file path
 
-    main(args.pgn_file_path, args.max_games)
+    main(args.pgn_file_path, args.max_games, args.resume_from)
