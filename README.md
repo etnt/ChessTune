@@ -39,6 +39,11 @@ A complete list of requirements can be found in `requirements.txt`.
 - `chess-tune.py`: Main script for processing data and training the model.
 - `play-chess.py`: Script for playing chess against the trained AI.
 
+## Time to train
+
+On a Macbook Pro M1 Max with 64 GB of RAM, training capacity is roughly 11 games per minute.
+For example: 1067 games took 83 minutes to train, and 2924 games took 264 minutes to train.
+
 ## Future Improvements
 
 - Implement a GUI for a more user-friendly chess playing experience.
