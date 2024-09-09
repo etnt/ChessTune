@@ -43,6 +43,8 @@ A complete list of requirements can be found in `requirements.txt`.
 
 On a Macbook Pro M1 Max with 64 GB of RAM, training capacity is roughly 11 games per minute.
 For example: 1067 games took 83 minutes to train, and 2924 games took 264 minutes to train.
+To put this in perspective, lichess.org had ~92 millions games played in August 2024; that
+would take roughtly 16 years to train with this setup... (see: https://database.lichess.org/).
 
 ## HTTP API
 
