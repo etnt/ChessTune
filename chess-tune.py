@@ -4,6 +4,7 @@ import argparse
 from datasets import Dataset
 from transformers import AutoTokenizer, GPT2LMHeadModel, Trainer, TrainingArguments, DataCollatorForLanguageModeling
 import os
+import torch
 
 def preprocess_pgn(pgn_file_path, max_games=None):
     games = []
@@ -58,6 +59,17 @@ def main(pgn_dir, max_games=None, resume_from=None):
     tokenized_dataset = dataset.map(tokenize_function, batched=True, remove_columns=dataset.column_names)
     print("Dataset tokenized")
 
+    # Check for MPS availability
+    if torch.backends.mps.is_available():
+        device = torch.device("mps")
+        print("Using MPS (Metal Performance Shaders) device")
+    elif torch.cuda.is_available():
+        device = torch.device("cuda")
+        print("Using CUDA device")
+    else:
+        device = torch.device("cpu")
+        print("Using CPU device")
+
     # Initialize model
     if resume_from and os.path.exists(resume_from):
         print(f"Resuming training from {resume_from}")
@@ -67,6 +79,7 @@ def main(pgn_dir, max_games=None, resume_from=None):
         model = GPT2LMHeadModel.from_pretrained(model_name)
     
     model.resize_token_embeddings(len(tokenizer))
+    model.to(device)  # Move model to the selected device
 
     # Set up data collator
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
@@ -97,7 +110,8 @@ def main(pgn_dir, max_games=None, resume_from=None):
         logging_steps=100,
         eval_strategy="steps",  # Instead of evaluation_strategy
         eval_steps=500,
-        load_best_model_at_end=True,
+        load_best_model_at_end=True
+        #use_mps_device=True,  # Use this instead of 'device'
     )
 
     # Initialize Trainer
