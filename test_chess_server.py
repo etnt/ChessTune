@@ -13,7 +13,7 @@ class TestChessServer(unittest.TestCase):
                                               stderr=subprocess.PIPE)
         # Wait for the server to start
         time.sleep(10)  # Increased wait time
-        cls.base_url = "http://localhost:5000"
+        cls.base_url = "http://127.0.0.1:5000"
 
         # Check if the server started successfully
         if cls.server_process.poll() is not None:
@@ -89,6 +89,43 @@ class TestChessServer(unittest.TestCase):
         data = response.json()
         self.assertEqual(data["status"], "ok")
         self.assertEqual(data["fen"], "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1")
+
+    def test_make_ai_move(self):
+        # Initialize a new game
+        requests.post(f"{self.base_url}/init")
+        
+        # Test with a valid FEN string
+        initial_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+        response = requests.post(f"{self.base_url}/make_ai_move", json={"fen": initial_fen})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "ok")
+        self.assertIn("move", data)
+        self.assertIn("new_fen", data)
+        self.assertNotEqual(data["new_fen"], initial_fen)
+
+        # Test with an invalid FEN string
+        invalid_fen = "invalid_fen_string"
+        response = requests.post(f"{self.base_url}/make_ai_move", json={"fen": invalid_fen})
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertEqual(data["status"], "error")
+        self.assertEqual(data["message"], "Invalid FEN string")
+
+        # Test with a game-over position
+        game_over_fen = "4k3/4P3/4K3/8/8/8/8/8 b - - 0 1"  # Black is in checkmate
+        response = requests.post(f"{self.base_url}/make_ai_move", json={"fen": game_over_fen})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "game_over")
+        self.assertIn("result", data)
+
+        # Test without providing a FEN string
+        response = requests.post(f"{self.base_url}/make_ai_move", json={})
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertEqual(data["status"], "error")
+        self.assertEqual(data["message"], "FEN string is required")
 
 if __name__ == "__main__":
     unittest.main()

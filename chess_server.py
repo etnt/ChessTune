@@ -1,3 +1,27 @@
+"""
+Chess Server API Endpoints:
+
+1. Initialize a new game:
+   POST /init
+   curl -X POST http://localhost:5000/init
+
+2. Make a move:
+   POST /move
+   curl -X POST -H "Content-Type: application/json" -d '{"move": "e4"}' http://localhost:5000/move
+
+3. Get AI's move suggestion:
+   GET /get_move
+   curl http://localhost:5000/get_move
+
+4. Make AI's move on current board:
+   POST /make_ai_move
+   curl -X POST -H "Content-Type: application/json" -d '{"fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"}' http://localhost:5000/make_ai_move
+
+5. Get current board state:
+   GET /board
+   curl http://localhost:5000/board
+"""
+
 from flask import Flask, request, jsonify
 import chess
 import chess.pgn
@@ -5,22 +29,11 @@ from transformers import GPT2LMHeadModel, AutoTokenizer
 import torch
 import argparse
 import logging
-import sys
-import traceback
-
-# Initialize a new game:
-#   curl -X POST http://localhost:5000/init
-#
-# Make a move:
-#   curl -X POST -H "Content-Type: application/json" -d '{"move": "e4"}' http://localhost:5000/move
-#
-# Get AI's move:
-#   curl http://localhost:5000/get_move
-#
-# Get current board state:
-#   curl http://localhost:5000/board
+import random
+from flask_cors import CORS
 
 app = Flask(__name__)
+#CORS(app)  # This will enable CORS for all routes
 
 # Global variables to store the model, tokenizer, and current game state
 model = None
@@ -104,13 +117,67 @@ def get_ai_move():
                 return jsonify({"status": "ok", "move": move_san})
         except ValueError:
             continue
-    
-    return jsonify({"status": "error", "message": "No valid move found"}), 500
+    # If no generated move is legal, choose a random move
+    legal_moves = list(board.legal_moves)
+    if legal_moves:
+        random_move = random.choice(legal_moves)
+        board.push(random_move)
+        return jsonify({"status": "ok", "move": board.san(random_move)})
+    else:
+        return jsonify({"status": "error", "message": "No valid move found"}), 500
 
 @app.route('/board', methods=['GET'])
 def get_board():
     global board
     return jsonify({"status": "ok", "fen": board.fen(en_passant='fen')})
+
+@app.route('/make_ai_move', methods=['POST'])
+def make_ai_move():
+    """
+    Make AI's move on current board.
+    This is an alternative to /get_move, where the AI's move is applied directly to the board.
+    """
+    global board
+    fen = request.json.get('fen')
+    if not fen:
+        return jsonify({"status": "error", "message": "FEN string is required"}), 400
+    
+    try:
+        board = chess.Board(fen)
+        if board.is_game_over():
+            return jsonify({"status": "game_over", "result": board.result()})
+        
+        generated_moves = generate_move()
+        
+        for move_san in generated_moves:
+            try:
+                move = board.parse_san(move_san)
+                if move in board.legal_moves:
+                    board.push(move)
+                    return jsonify({
+                        "status": "ok",
+                        "move": move_san,
+                        "new_fen": board.fen(en_passant='fen')
+                    })
+            except ValueError:
+                continue
+        
+        # If no generated move is legal, choose a random move
+        legal_moves = list(board.legal_moves)
+        if legal_moves:
+            random_move = random.choice(legal_moves)
+            board.push(random_move)
+            return jsonify({"status": "ok", "move": board.san(random_move)})
+        else:
+            return jsonify({"status": "error", "message": "No valid move found"}), 500
+        
+    except ValueError:
+        return jsonify({"status": "error", "message": "Invalid FEN string"}), 400
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    app.logger.error(f"Unhandled exception: {str(e)}")
+    return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Chess server using GPT-2 model")
