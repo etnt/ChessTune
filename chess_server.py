@@ -87,12 +87,45 @@ def generate_move(num_moves=5):
 
 @app.route('/init', methods=['POST'])
 def init_game():
+    """
+    Initialize a new chess game.
+
+    This function is called when a POST request is made to the '/init' endpoint.
+    It creates a new chess board and sets it as the global board state.
+
+    Returns:
+    JSON: A dictionary containing the status of the operation and a message.
+        - status: 'ok' if the game was successfully initialized.
+        - message: A string confirming that a new game was initialized.
+    """
     global board
     board = chess.Board()
     return jsonify({"status": "ok", "message": "New game initialized"})
 
 @app.route('/move', methods=['POST'])
 def make_move():
+    """
+    Apply a move to the current chess board.
+
+    This function is called when a POST request is made to the '/move' endpoint.
+    It expects a JSON payload with a 'move' key containing the move in Standard Algebraic Notation (SAN).
+
+    Args:
+        None (uses global 'board' variable)
+
+    Returns:
+    JSON: A dictionary containing the status of the operation and a message.
+        - If the move is valid:
+            status: 'ok'
+            message: A string confirming that the move was applied
+        - If the move is invalid:
+            status: 'error'
+            message: 'Invalid move'
+            HTTP status code: 400 (Bad Request)
+
+    Raises:
+        ValueError: If the provided move is not valid in the current board position
+    """
     global board
     move = request.json.get('move')
     try:
@@ -103,6 +136,37 @@ def make_move():
 
 @app.route('/get_move', methods=['GET'])
 def get_ai_move():
+    """
+    Generate and apply an AI move to the current chess board.
+
+    This function is called when a GET request is made to the '/get_move' endpoint.
+    It generates a list of possible moves using the AI model, attempts to apply them,
+    and falls back to a random legal move if necessary.
+
+    Returns:
+    JSON: A dictionary containing the status of the operation and move information.
+        - If the game is over:
+            status: 'game_over'
+            result: The result of the game
+        - If a valid move is made:
+            status: 'ok'
+            move: The move in Standard Algebraic Notation (SAN)
+            new_fen: The new board state in Forsyth-Edwards Notation (FEN)
+        - If no valid move is found:
+            status: 'error'
+            message: 'No valid move found'
+            HTTP status code: 500 (Internal Server Error)
+
+    Global Variables:
+        board (chess.Board): The current state of the chess game
+
+    Functions called:
+        generate_move(): Generate a list of possible moves using the AI model
+        board.parse_san(move_san): Parse a move in SAN format
+        board.push(move): Apply a move to the board
+        board.fen(en_passant='fen'): Get the current board state in FEN notation
+        random.choice(legal_moves): Select a random move from the list of legal moves
+    """
     global board
     if board.is_game_over():
         return jsonify({"status": "game_over", "result": board.result()})
@@ -111,68 +175,56 @@ def get_ai_move():
     
     for move_san in generated_moves:
         try:
+            print(f"Attempting to parse move: {move_san}")
             move = board.parse_san(move_san)
+            print(f"Parsed move: {move}")
             if move in board.legal_moves:
+                print(f"Move {move_san} is legal")
                 board.push(move)
-                return jsonify({"status": "ok", "move": move_san})
-        except ValueError:
+                return jsonify({
+                    "status": "ok",
+                    "move": move_san,
+                    "new_fen": board.fen(en_passant='fen')
+                })
+            else:
+                print(f"Move {move_san} is not legal in the current position")
+        except ValueError as e:
+            print(f"Error parsing move {move_san}: {str(e)}")
             continue
     # If no generated move is legal, choose a random move
     legal_moves = list(board.legal_moves)
     if legal_moves:
         random_move = random.choice(legal_moves)
         board.push(random_move)
-        return jsonify({"status": "ok", "move": board.san(random_move)})
+        return jsonify({"status": "ok",
+                         "move": board.san(random_move),
+                         "new_fen": board.fen(en_passant='fen')
+                        })
     else:
         return jsonify({"status": "error", "message": "No valid move found"}), 500
 
 @app.route('/board', methods=['GET'])
 def get_board():
+    """
+    Endpoint to get the current state of the chess board.
+
+    This function handles GET requests to the '/board' route.
+    It returns the current state of the chess board in FEN (Forsyth–Edwards Notation) format.
+
+    Returns:
+        JSON: A dictionary containing:
+            - 'status': Always 'ok' for this endpoint
+            - 'fen': The current board state in FEN notation
+
+    Global Variables:
+        board (chess.Board): The current state of the chess game
+
+    Functions called:
+        board.fen(en_passant='fen'): Get the current board state in FEN notation
+    """
     global board
     return jsonify({"status": "ok", "fen": board.fen(en_passant='fen')})
 
-@app.route('/make_ai_move', methods=['POST'])
-def make_ai_move():
-    """
-    Make AI's move on current board.
-    This is an alternative to /get_move, where the AI's move is applied directly to the board.
-    """
-    global board
-    fen = request.json.get('fen')
-    if not fen:
-        return jsonify({"status": "error", "message": "FEN string is required"}), 400
-    
-    try:
-        board = chess.Board(fen)
-        if board.is_game_over():
-            return jsonify({"status": "game_over", "result": board.result()})
-        
-        generated_moves = generate_move()
-        
-        for move_san in generated_moves:
-            try:
-                move = board.parse_san(move_san)
-                if move in board.legal_moves:
-                    board.push(move)
-                    return jsonify({
-                        "status": "ok",
-                        "move": move_san,
-                        "new_fen": board.fen(en_passant='fen')
-                    })
-            except ValueError:
-                continue
-        
-        # If no generated move is legal, choose a random move
-        legal_moves = list(board.legal_moves)
-        if legal_moves:
-            random_move = random.choice(legal_moves)
-            board.push(random_move)
-            return jsonify({"status": "ok", "move": board.san(random_move)})
-        else:
-            return jsonify({"status": "error", "message": "No valid move found"}), 500
-        
-    except ValueError:
-        return jsonify({"status": "error", "message": "Invalid FEN string"}), 400
 
 @app.errorhandler(Exception)
 def handle_exception(e):
