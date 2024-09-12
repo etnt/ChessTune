@@ -6,6 +6,7 @@ import torch
 import argparse
 import logging
 import random
+import traceback
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -17,6 +18,7 @@ tokenizer = None
 board = None
 
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def load_model(model_path):
     """
@@ -30,9 +32,14 @@ def load_model(model_path):
         tokenizer: The loaded tokenizer.
     """
     global model, tokenizer
-    model = GPT2LMHeadModel.from_pretrained(model_path)
-    tokenizer = AutoTokenizer.from_pretrained("gpt2-medium")
-    tokenizer.pad_token = tokenizer.eos_token
+    try:
+        model = GPT2LMHeadModel.from_pretrained(model_path)
+        tokenizer = AutoTokenizer.from_pretrained("gpt2-medium")
+        tokenizer.pad_token = tokenizer.eos_token
+        logger.info("Model and tokenizer loaded successfully")
+    except Exception as e:
+        logger.error(f"Error loading model: {str(e)}")
+        raise
 
 def generate_move(num_moves=10):
     """
@@ -51,32 +58,30 @@ def generate_move(num_moves=10):
     """
     global model, tokenizer, board
     
-    game = chess.pgn.Game.from_board(board)
-    moves_str = ""
     try:
-        moves_str = " ".join([board.san(move) for move in game.mainline_moves()])
-    except AssertionError as e:
-        logging.error(f"Error generating move history: {str(e)}")
-        moves_str = board.fen()
+        # Use the current board state directly
+        prompt = f"{board.fen()} Next move:"
+        
+        inputs = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True)
 
-    prompt = f"{moves_str} Next move:"
-    
-    inputs = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True)
+        with torch.no_grad():
+            outputs = model.generate(
+                inputs.input_ids,
+                max_length=inputs.input_ids.shape[1] + 10,
+                num_return_sequences=num_moves,
+                do_sample=True,
+                temperature=0.7,
+                attention_mask=inputs.attention_mask
+            )
 
-    with torch.no_grad():
-        outputs = model.generate(
-            inputs.input_ids,
-            max_length=inputs.input_ids.shape[1] + 10,
-            num_return_sequences=num_moves,
-            do_sample=True,
-            temperature=0.7,
-            attention_mask=inputs.attention_mask
-        )
+        generated_moves = [tokenizer.decode(output[inputs.input_ids.shape[1]:], skip_special_tokens=True).strip().split()[0] for output in outputs]
+        legal_moves = [move for move in generated_moves if move in [board.san(legal_move) for legal_move in board.legal_moves]]
 
-    generated_moves = [tokenizer.decode(output[inputs.input_ids.shape[1]:], skip_special_tokens=True).strip().split()[0] for output in outputs]
-    legal_moves = [move for move in generated_moves if move in [board.san(legal_move) for legal_move in board.legal_moves]]
-
-    return legal_moves
+        logger.info(f"Generated moves: {legal_moves}")
+        return legal_moves
+    except Exception as e:
+        logger.error(f"Error in generate_move: {str(e)}")
+        return []
 
 @app.route('/init', methods=['POST'])
 def init_game():
@@ -90,9 +95,13 @@ def init_game():
         board: The chess board to be initialized.
     """
     global board
-    board = chess.Board()
-    print(f"/init : {board.fen()}")
-    return jsonify({"status": "ok", "message": "New game initialized"})
+    try:
+        board = chess.Board()
+        logger.info(f"/init : {board.fen()}")
+        return jsonify({"status": "ok", "message": "New game initialized"})
+    except Exception as e:
+        logger.error(f"Error in init_game: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/move', methods=['POST'])
 def make_move():
@@ -119,12 +128,13 @@ def make_move():
     
     global board
 
-    print(f"/move before : {board.fen()}")
+    logger.info(f"/move {move} before : {board.fen()}")
     try:
         board.push_san(move)
-        print(f"/move after : {board.fen()}")
+        logger.info(f"/move after : {board.fen()}")
         return jsonify({"status": "ok", "message": f"Move {move} applied"})
-    except ValueError:
+    except ValueError as e:
+        logger.error(f"/move Error applying move: {str(e)}")
         return jsonify({"status": "error", "message": "Invalid move"}), 400
 
 @app.route('/get_move', methods=['GET'])
@@ -139,36 +149,43 @@ def get_ai_move():
         board: The current chess board state.
     """
     global board
-    if board.is_game_over():
-        return jsonify({"status": "game_over", "result": board.result()})
-    
-    generated_moves = generate_move()
-    
-    for move_san in generated_moves:
-        try:
-            move = board.parse_san(move_san)
-            if move in board.legal_moves:
-                board.push(move)
-                return jsonify({
-                    "status": "ok",
-                    "move": move_san,
-                    "new_fen": board.fen(en_passant='fen')
-                })
-        except ValueError:
-            continue
-    
-    legal_moves = list(board.legal_moves)
-    if legal_moves:
-        random_move = random.choice(legal_moves)
-        board.push(random_move)
-        move_san = board.san(random_move)
-        return jsonify({
-            "status": "ok",
-            "move": move_san,
-            "new_fen": board.fen(en_passant='fen')
-        })
-    else:
-        return jsonify({"status": "error", "message": "No valid move found"}), 500
+    try:
+        if board.is_game_over():
+            return jsonify({"status": "game_over", "result": board.result()})
+        
+        generated_moves = generate_move()
+        logger.info(f"/get_move Generated moves: {generated_moves}")
+        
+        for move_san in generated_moves:
+            try:
+                move = board.parse_san(move_san)
+                if move in board.legal_moves:
+                    board.push(move)
+                    return jsonify({
+                        "status": "ok",
+                        "move": move_san,
+                        "new_fen": board.fen(en_passant='fen')
+                    })
+            except ValueError:
+                continue
+
+        logger.info(f"/get_move Falling back to random move")
+        legal_moves = list(board.legal_moves)
+        if legal_moves:
+            random_move = random.choice(legal_moves)
+            move_san = board.san(random_move)
+            board.push(random_move)
+            logger.info(f"/get_move Random move: {move_san}")
+            return jsonify({
+                "status": "ok",
+                "move": move_san,
+                "new_fen": board.fen(en_passant='fen')
+            })
+        else:
+            return jsonify({"status": "error", "message": "No valid moves available"}), 500
+    except Exception as e:
+        logger.error(f"Error in get_ai_move: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/board', methods=['GET'])
 def get_board():
@@ -182,7 +199,11 @@ def get_board():
         board: The current chess board state.
     """
     global board
-    return jsonify({"status": "ok", "fen": board.fen(en_passant='fen')})
+    try:
+        return jsonify({"status": "ok", "fen": board.fen(en_passant='fen')})
+    except Exception as e:
+        logger.error(f"Error in get_board: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.errorhandler(404)
 def not_found(error):
@@ -208,8 +229,9 @@ def handle_exception(e):
     Returns:
         dict: A JSON response indicating an internal server error.
     """
-    app.logger.error(f"Unhandled exception: {str(e)}")
-    return jsonify({"status": "error", "message": "Internal server error"}), 500
+    logger.error(f"Unhandled exception: {str(e)}")
+    logger.error(f"Traceback: {traceback.format_exc()}")
+    return jsonify({"status": "error", "message": f"Internal server error: {str(e)}"}), 500
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Chess server using GPT-2 model")
