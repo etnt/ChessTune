@@ -47,7 +47,8 @@ To put this in perspective, lichess.org had ~92 millions games played in August 
 would take roughtly 16 years to train with this setup... (see: https://database.lichess.org/).
 
 **UPDATE**: It turned out that I didn't make use of the MPS (GPU) on my Mac; so now when using
-MPS the training speed is much faster. With MPS, 1067 games were trained in 18 minutes.
+MPS the training speed is much faster. With MPS, 1067 games were trained in 18 minutes and with
+4177 games it took 107 minutes.
 
 ## HTTP API
 
