@@ -47,7 +47,7 @@ def preprocess_pgn(pgn_file_path, max_games=None):
 
 
 def tokenize_function(examples):
-    return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=512)
+    return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=1024)  # Increased from 512
 
 
 
@@ -94,18 +94,25 @@ def main(pgn_dir, max_games=None, resume_from=None):
     dataset = Dataset.from_list(all_chess_data)
     print(f"Dataset size: {len(dataset)}")
 
+    # Split dataset into train and validation
+    dataset = dataset.train_test_split(test_size=0.1)
+    train_dataset = dataset['train']
+    val_dataset = dataset['test']
+    print(f"Training set size: {len(train_dataset)}, Validation set size: {len(val_dataset)}")
+
     # Initialize tokenizer
     global tokenizer
-    # GPT2-medium is chosen here, but you might want to experiment with other models
-    model_name = "gpt2-medium"
+    # GPT2-large is chosen here for better performance
+    model_name = "gpt2-large"
 
-    # Download and initialize the tokenizer that was used with our choosen model.
+    # Download and initialize the tokenizer that was used with our chosen model.
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     tokenizer.pad_token = tokenizer.eos_token
 
-    # Tokenize the dataset
-    tokenized_dataset = dataset.map(tokenize_function, batched=True, remove_columns=dataset.column_names)
-    print("Dataset tokenized")
+    # Tokenize the datasets
+    train_tokenized = train_dataset.map(tokenize_function, batched=True, remove_columns=train_dataset.column_names)
+    val_tokenized = val_dataset.map(tokenize_function, batched=True, remove_columns=val_dataset.column_names)
+    print("Datasets tokenized")
 
     # Check for MPS availability
     if torch.backends.mps.is_available():
@@ -142,39 +149,29 @@ def main(pgn_dir, max_games=None, resume_from=None):
     # Set up training arguments
     training_args = TrainingArguments(
         output_dir="./results",
-
-        # An epoch is one complete pass through the entire training dataset.
-        # More epochs can lead to better learning, but too many can cause overfitting.
-        num_train_epochs=3,  # Adjust this as needed
-
-        # This sets the batch size for training on each device (e.g., GPU or CPU).
-        # Larger batch sizes can lead to faster training but require more memory.
+        num_train_epochs=10,  # Increased from 3
         per_device_train_batch_size=4,
-
-        # This parameter determines how often the model is saved during training.
-        # A "step" typically refers to processing one batch of data.
-        # In this case, the model will be saved every 1000 steps.
         save_steps=1000,
-
-        # This parameter limits the total number of checkpoint files saved.
-        # When this limit is reached, older checkpoints are deleted.
-        # This is useful for saving disk space, as model checkpoints can be large
         save_total_limit=2,
-
-        
         logging_steps=100,
-        eval_strategy="steps",  # Instead of evaluation_strategy
+        evaluation_strategy="steps",
         eval_steps=500,
-        load_best_model_at_end=True
-        #use_mps_device=True,  # Use this instead of 'device'
+        load_best_model_at_end=True,
+        learning_rate=5e-5,  # Explicitly set learning rate
+        warmup_steps=500,  # Add warmup steps
+        weight_decay=0.01,  # Add weight decay for regularization
+        # Early stopping
+        metric_for_best_model="eval_loss",
+        greater_is_better=False,
+        early_stopping_patience=3,
     )
 
     # Initialize Trainer
     trainer = Trainer(
         model=model,
         args=training_args,
-        train_dataset=tokenized_dataset,
-        eval_dataset=tokenized_dataset,  # Using the same dataset for evaluation (you might want to create a separate validation set)
+        train_dataset=train_tokenized,
+        eval_dataset=val_tokenized,
         data_collator=data_collator,
     )
 
