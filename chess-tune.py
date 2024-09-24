@@ -2,7 +2,7 @@ import chess
 import chess.pgn
 import argparse
 from datasets import Dataset
-from transformers import AutoTokenizer, GPT2LMHeadModel, Trainer, TrainingArguments, DataCollatorForLanguageModeling
+from transformers import AutoTokenizer, GPT2LMHeadModel, Trainer, TrainingArguments, DataCollatorForLanguageModeling, EarlyStoppingCallback
 import os
 import torch
 
@@ -149,7 +149,7 @@ def main(pgn_dir, max_games=None, resume_from=None):
     # Set up training arguments
     training_args = TrainingArguments(
         output_dir="./results",
-        num_train_epochs=10,  # Increased from 3
+        num_train_epochs=10,
         per_device_train_batch_size=4,
         save_steps=1000,
         save_total_limit=2,
@@ -157,22 +157,21 @@ def main(pgn_dir, max_games=None, resume_from=None):
         evaluation_strategy="steps",
         eval_steps=500,
         load_best_model_at_end=True,
-        learning_rate=5e-5,  # Explicitly set learning rate
-        warmup_steps=500,  # Add warmup steps
-        weight_decay=0.01,  # Add weight decay for regularization
-        # Early stopping
+        learning_rate=5e-5,
+        warmup_steps=500,
+        weight_decay=0.01,
         metric_for_best_model="eval_loss",
         greater_is_better=False,
-        early_stopping_patience=3,
     )
 
-    # Initialize Trainer
+    # Initialize Trainer with EarlyStoppingCallback
     trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=train_tokenized,
         eval_dataset=val_tokenized,
         data_collator=data_collator,
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)]
     )
 
     print("Starting training...")
