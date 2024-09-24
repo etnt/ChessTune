@@ -47,7 +47,7 @@ def preprocess_pgn(pgn_file_path, max_games=None):
 
 
 def tokenize_function(examples):
-    return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=1024)  # Increased from 512
+    return tokenizer(examples["text"], padding=True, truncation=True, max_length=512)
 
 
 
@@ -149,19 +149,21 @@ def main(pgn_dir, max_games=None, resume_from=None):
     # Set up training arguments
     training_args = TrainingArguments(
         output_dir="./results",
-        num_train_epochs=10,
-        per_device_train_batch_size=4,
-        save_steps=1000,
+        num_train_epochs=5,
+        per_device_train_batch_size=8,
+        per_device_eval_batch_size=8,
+        save_steps=2000,
         save_total_limit=2,
-        logging_steps=100,
+        logging_steps=500,
         evaluation_strategy="steps",
-        eval_steps=500,
+        eval_steps=1000,
         load_best_model_at_end=True,
         learning_rate=5e-5,
         warmup_steps=500,
         weight_decay=0.01,
         metric_for_best_model="eval_loss",
         greater_is_better=False,
+        fp16=(device.type == 'cuda'),  # Enable mixed precision training only for CUDA
     )
 
     # Initialize Trainer with EarlyStoppingCallback
@@ -171,7 +173,7 @@ def main(pgn_dir, max_games=None, resume_from=None):
         train_dataset=train_tokenized,
         eval_dataset=val_tokenized,
         data_collator=data_collator,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)]
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=2)]
     )
 
     print("Starting training...")
