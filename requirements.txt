@@ -3,4 +3,9 @@ datasets==2.21.0
 transformers==4.44.2
 torch==2.4.1
 Flask==3.0.3
+Flask-CORS==4.0.0
 requests==2.32.3
+cairosvg==2.7.0
+Pillow==9.5.0
+pygame==2.5.2
+

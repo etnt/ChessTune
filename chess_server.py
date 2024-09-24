@@ -8,14 +8,17 @@ import logging
 import random
 import traceback
 from flask_cors import CORS
+from collections import deque
 
 app = Flask(__name__)
-#CORS(app)  # This will enable CORS for all routes
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)  # Enable CORS for all routes and origins, and allow credentials
 
 # Global variables to store the model, tokenizer, and current game state
 model = None
 tokenizer = None
 board = None
+move_history = deque()
+current_position = -1
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -56,6 +59,8 @@ def generate_move(num_moves=10):
         tokenizer: The loaded tokenizer.
         board: The current chess board state.
     """
+    ensure_board_initialized()
+    
     global model, tokenizer, board
     
     try:
@@ -83,6 +88,13 @@ def generate_move(num_moves=10):
         logger.error(f"Error in generate_move: {str(e)}")
         return []
 
+# Add this at the beginning of the file, after the global variable declarations
+def ensure_board_initialized():
+    global board
+    if board is None:
+        board = chess.Board()
+        logger.info("Board initialized")
+
 @app.route('/init', methods=['POST'])
 def init_game():
     """
@@ -93,10 +105,14 @@ def init_game():
 
     Global variables:
         board: The chess board to be initialized.
+        move_history: The history of moves to be reset.
+        current_position: The current position in the move history to be reset.
     """
-    global board
+    global board, move_history, current_position
     try:
         board = chess.Board()
+        move_history = deque()
+        current_position = -1
         logger.info(f"/init : {board.fen()}")
         return jsonify({"status": "ok", "message": "New game initialized"})
     except Exception as e:
@@ -110,7 +126,7 @@ def make_move():
 
     Expected JSON payload:
         {
-            "move": "string"  # The move in Standard Algebraic Notation (SAN)
+            "move": "string"  # The move in UCI notation
         }
 
     Returns:
@@ -118,24 +134,54 @@ def make_move():
 
     Global variables:
         board: The current chess board state.
+        move_history: The history of moves made in the game.
+        current_position: The current position in the move history.
     """
+    ensure_board_initialized()
+    
+    logger.info(f"Received /move request: {request.json}")
+    logger.info(f"Request headers: {request.headers}")
+    logger.info(f"Request data: {request.data}")
     if not request.is_json:
+        logger.error("Invalid JSON received")
         return jsonify({"status": "error", "message": "Invalid JSON"}), 400
     
     move = request.json.get('move')
+    promotion = request.json.get('promotion')
     if not move:
+        logger.error("Move not provided in request")
         return jsonify({"status": "error", "message": "Move not provided"}), 400
     
-    global board
+    global board, move_history, current_position
 
     logger.info(f"/move {move} before : {board.fen()}")
     try:
-        board.push_san(move)
-        logger.info(f"/move after : {board.fen()}")
-        return jsonify({"status": "ok", "message": f"Move {move} applied"})
+        from_square = chess.parse_square(move[:2])
+        to_square = chess.parse_square(move[2:4])
+        
+        # Check if it's a pawn promotion move
+        if board.piece_at(from_square).piece_type == chess.PAWN and chess.square_rank(to_square) in [0, 7]:
+            if not promotion:
+                return jsonify({"status": "promotion_required", "message": "Pawn promotion piece required"}), 400
+            move_obj = chess.Move(from_square, to_square, promotion=chess.Piece.from_symbol(promotion).piece_type)
+        else:
+            move_obj = chess.Move(from_square, to_square)
+
+        if move_obj in board.legal_moves:
+            board.push(move_obj)
+            current_position += 1
+            if current_position < len(move_history):
+                # If we're not at the end of the history, truncate the future moves
+                move_history = deque(list(move_history)[:current_position + 1])
+            move_history.append(move_obj)
+            logger.info(f"/move after : {board.fen()}")
+            return jsonify({"status": "ok", "message": f"Move {move} applied"})
+        else:
+            logger.error(f"Illegal move: {move}")
+            return jsonify({"status": "error", "message": "Illegal move"}), 400
     except ValueError as e:
         logger.error(f"/move Error applying move: {str(e)}")
-        return jsonify({"status": "error", "message": "Invalid move"}), 400
+        return jsonify({"status": "error", "message": f"Invalid move: {str(e)}"}), 400
 
 @app.route('/get_move', methods=['GET'])
 def get_ai_move():
@@ -148,10 +194,15 @@ def get_ai_move():
     Global variables:
         board: The current chess board state.
     """
+    ensure_board_initialized()
+    
     global board
+    logger.info("Received /get_move request")
     try:
         if board.is_game_over():
-            return jsonify({"status": "game_over", "result": board.result()})
+            result = board.result()
+            logger.info(f"Game over. Result: {result}")
+            return jsonify({"status": "game_over", "result": result})
         
         generated_moves = generate_move()
         logger.info(f"/get_move Generated moves: {generated_moves}")
@@ -161,27 +212,29 @@ def get_ai_move():
                 move = board.parse_san(move_san)
                 if move in board.legal_moves:
                     board.push(move)
+                    logger.info(f"AI move applied: {move_san}")
                     return jsonify({
                         "status": "ok",
-                        "move": move_san,
+                        "move": move.uci(),
                         "new_fen": board.fen(en_passant='fen')
                     })
             except ValueError:
+                logger.warning(f"Invalid move generated: {move_san}")
                 continue
 
         logger.info(f"/get_move Falling back to random move")
         legal_moves = list(board.legal_moves)
         if legal_moves:
             random_move = random.choice(legal_moves)
-            move_san = board.san(random_move)
             board.push(random_move)
-            logger.info(f"/get_move Random move: {move_san}")
+            logger.info(f"/get_move Random move: {random_move.uci()}")
             return jsonify({
                 "status": "ok",
-                "move": move_san,
+                "move": random_move.uci(),
                 "new_fen": board.fen(en_passant='fen')
             })
         else:
+            logger.error("No valid moves available")
             return jsonify({"status": "error", "message": "No valid moves available"}), 500
     except Exception as e:
         logger.error(f"Error in get_ai_move: {str(e)}")
@@ -218,6 +271,27 @@ def not_found(error):
     """
     return jsonify({"status": "error", "message": "Endpoint not found"}), 404
 
+@app.route('/undo', methods=['POST'])
+def undo_move():
+    global board, move_history, current_position
+    if current_position >= 0:
+        board.pop()
+        current_position -= 1
+        return jsonify({"status": "ok", "message": "Move undone", "fen": board.fen()})
+    else:
+        return jsonify({"status": "error", "message": "No moves to undo"}), 400
+
+@app.route('/redo', methods=['POST'])
+def redo_move():
+    global board, move_history, current_position
+    if current_position < len(move_history) - 1:
+        move = move_history[current_position + 1]
+        board.push(move)
+        current_position += 1
+        return jsonify({"status": "ok", "message": "Move redone", "fen": board.fen()})
+    else:
+        return jsonify({"status": "error", "message": "No moves to redo"}), 400
+
 @app.errorhandler(Exception)
 def handle_exception(e):
     """
@@ -236,9 +310,10 @@ def handle_exception(e):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Chess server using GPT-2 model")
     parser.add_argument("--model", default="./chess_model", help="Path to the trained model (default: ./chess_model)")
-    parser.add_argument("--port", type=int, default=5000, help="Port to run the server on (default: 5000)")
+    parser.add_argument("--port", type=int, default=9999, help="Port to run the server on (default: 9999)")
     
     args = parser.parse_args()
 
     load_model(args.model)
-    app.run(debug=True, port=args.port)
+
+    app.run(debug=True, port=args.port , host='0.0.0.0')
